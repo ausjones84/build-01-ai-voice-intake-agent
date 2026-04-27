@@ -1,0 +1,175 @@
+{
+  "name": "Build #1 - Retell AI Intake Webhook Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "retell-intake"
+      },
+      "id": "webhook-trigger",
+      "name": "Retell Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$input.first().json;const d={call_id:b.call_id,caller_phone:b.from_number,caller_name:b.call_analysis?.custom_analysis_data?.caller_name||'',caller_email:b.call_analysis?.custom_analysis_data?.caller_email||'',accident_type:b.call_analysis?.custom_analysis_data?.accident_type||'unknown',injuries_present:b.call_analysis?.custom_analysis_data?.injuries_present||false,injury_severity:b.call_analysis?.custom_analysis_data?.injury_severity||'unknown',at_fault_party_identified:b.call_analysis?.custom_analysis_data?.at_fault_party_identified||false,insurance_present:b.call_analysis?.custom_analysis_data?.insurance_present||false,days_since_incident:b.call_analysis?.custom_analysis_data?.days_since_incident||999,has_existing_attorney:b.call_analysis?.custom_analysis_data?.has_existing_attorney||false,call_transcript:b.transcript||'',recording_url:b.recording_url||''};let s=0;if(d.injuries_present)s+=40;if(d.injury_severity==='severe')s+=15;else if(d.injury_severity==='moderate')s+=8;if(d.at_fault_party_identified)s+=25;if(d.insurance_present)s+=20;if(d.days_since_incident<=30)s+=15;if(d.has_existing_attorney)s-=20;const ls=s>=60?'hot':s>=35?'warm':'cold';return{...d,lead_score:s,lead_status:ls,is_hot_lead:ls==='hot'};"
+      },
+      "id": "score-lead",
+      "name": "Score Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/contacts/",
+        "method": "POST"
+      },
+      "id": "ghl-contact",
+      "name": "Create GHL Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.is_hot_lead}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "route-lead",
+      "name": "Hot or Cold Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/conversations/messages",
+        "method": "POST"
+      },
+      "id": "sms-attorney",
+      "name": "SMS Attorney Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1250,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/opportunities/",
+        "method": "POST"
+      },
+      "id": "hot-opp",
+      "name": "Create Hot Lead Opportunity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/opportunities/",
+        "method": "POST"
+      },
+      "id": "cold-opp",
+      "name": "Create Cold Lead Opportunity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1250,
+        450
+      ]
+    }
+  ],
+  "connections": {
+    "Retell Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Score Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Lead": {
+      "main": [
+        [
+          {
+            "node": "Create GHL Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create GHL Contact": {
+      "main": [
+        [
+          {
+            "node": "Hot or Cold Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hot or Cold Lead?": {
+      "main": [
+        [
+          {
+            "node": "SMS Attorney Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create Hot Lead Opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Cold Lead Opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "build-01",
+    "retell",
+    "ghl",
+    "intake"
+  ]
+}
